@@ -231,9 +231,15 @@ function parseJSONData(response) {
     w.annotations = JSON.parse(response);
 }
 
-// Formatter for frequency that uses SI and appends units
+// Decimals used when formatting frequencies in MHz; chosen from the data span in initDisplay
+var freqDecimals = 0;
+function decimalsForSpan(span) {
+    return span >= 100e6 ? 0 : span >= 10e6 ? 1 : span >= 1e6 ? 2 : 3;
+}
+// Formatter for frequency in MHz, with enough decimals to keep adjacent ticks distinct
+// (d3's ".3s" SI format collapses e.g. every tick of a 1 MHz capture to "919M")
 function formatFrequency(n) {
-    return d3.format(".3s")(n) + "Hz";
+    return d3.format(",." + freqDecimals + "f")(n / 1e6) + " MHz";
 }
 
 // Initializes the waterfall display and its elements
@@ -259,6 +265,7 @@ function initDisplay(w) {
     w.x.domain(w.data.freqRange);
     w.y.domain(w.data.timeRange);
     w.z.domain(w.data.dbRange);
+    freqDecimals = decimalsForSpan(w.data.freqRange[1] - w.data.freqRange[0]);
 
     // Set the canvas size to the element size, and draw an invisible svg rectangle on top
     w.canvas.attr("width", elementWidth)
