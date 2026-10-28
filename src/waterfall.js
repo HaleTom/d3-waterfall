@@ -231,16 +231,28 @@ function parseJSONData(response) {
     w.annotations = JSON.parse(response);
 }
 
-// Decimals used when formatting frequencies in MHz; chosen from the data span in initDisplay
-var freqDecimals = 0;
-function decimalsForSpan(span) {
-    return span >= 100e6 ? 0 : span >= 10e6 ? 1 : span >= 1e6 ? 2 : 3;
+// SI unit picked from the magnitude so GHz/kHz captures label correctly too
+function unitFor(n) {
+    var a = Math.abs(n);
+    if (a >= 1e9) return { s: 1e9, u: 'GHz' };
+    if (a >= 1e6) return { s: 1e6, u: 'MHz' };
+    if (a >= 1e3) return { s: 1e3, u: 'kHz' };
+    return { s: 1, u: 'Hz' };
 }
-// Formatter for frequency in MHz, with enough decimals to keep adjacent ticks distinct
+// Builds a frequency formatter for the given data range: unit from the magnitude,
+// decimals from the ~16-tick step so adjacent ticks stay distinct
 // (d3's ".3s" SI format collapses e.g. every tick of a 1 MHz capture to "919M")
-function formatFrequency(n) {
-    return d3.format(",." + freqDecimals + "f")(n / 1e6) + " MHz";
+function frequencyFormat(range) {
+    var unit = unitFor(Math.max(Math.abs(range[0]), Math.abs(range[1])));
+    var step = (range[1] - range[0]) / 16 / unit.s;
+    var dec = step > 0 ? Math.max(0, Math.ceil(-Math.log10(step))) : 0;
+    var fmt = d3.format(",." + dec + "f");
+    return function (n) { return fmt(n / unit.s) + " " + unit.u; };
 }
+// Assigned in initDisplay from the data range; default matches the old behavior
+var formatFrequency = function (n) {
+    return d3.format(".3s")(n) + "Hz";
+};
 
 // Initializes the waterfall display and its elements
 function initDisplay(w) {
@@ -265,7 +277,7 @@ function initDisplay(w) {
     w.x.domain(w.data.freqRange);
     w.y.domain(w.data.timeRange);
     w.z.domain(w.data.dbRange);
-    freqDecimals = decimalsForSpan(w.data.freqRange[1] - w.data.freqRange[0]);
+    formatFrequency = frequencyFormat(w.data.freqRange);
 
     // Set the canvas size to the element size, and draw an invisible svg rectangle on top
     w.canvas.attr("width", elementWidth)
